@@ -47,14 +47,14 @@ export default function BrokerRequest() {
   const validateInput = (name, value) => {
     switch (name) {
       case 'title':
-        return value.length >= 3 && value.length <= 100
+        return value.length >= 3 && value.length <= 200
       case 'description':
-        return value.length >= 10 && value.length <= 500
+        return value.length >= 10 && value.length <= 2000
       case 'price':
         const price = parseFloat(value)
         return !isNaN(price) && price > 0 && price <= 10000000
       case 'location':
-        return value.length >= 2 && value.length <= 50
+        return value.length >= 2 && value.length <= 200
       case 'contactInfo':
         const phoneRegex = /^(\+966|0)?[5-9][0-9]{8}$/
         return phoneRegex.test(value.replace(/\s/g, ''))
@@ -92,11 +92,11 @@ export default function BrokerRequest() {
     switch (name) {
       case 'title':
         if (value.length < 3) return 'العنوان يجب أن يكون 3 أحرف على الأقل'
-        if (value.length > 100) return 'العنوان يجب أن يكون أقل من 100 حرف'
+        if (value.length > 200) return 'العنوان يجب أن يكون أقل من 200 حرف'
         break
       case 'description':
         if (value.length < 10) return 'الوصف يجب أن يكون 10 أحرف على الأقل'
-        if (value.length > 500) return 'الوصف يجب أن يكون أقل من 500 حرف'
+        if (value.length > 2000) return 'الوصف يجب أن يكون أقل من 2000 حرف'
         break
       case 'price':
         const price = parseFloat(value)
@@ -106,7 +106,7 @@ export default function BrokerRequest() {
         break
       case 'location':
         if (value.length < 2) return 'الموقع يجب أن يكون حرفين على الأقل'
-        if (value.length > 50) return 'الموقع يجب أن يكون أقل من 50 حرف'
+        if (value.length > 200) return 'الموقع يجب أن يكون أقل من 200 حرف'
         break
       case 'contactInfo':
         const phoneRegex = /^(\+966|0)?[5-9][0-9]{8}$/
@@ -151,7 +151,7 @@ export default function BrokerRequest() {
     
     try {
       const requestData = {
-        buyer_id: userId,
+        user_id: userId,
         title: formData.title,
         description: formData.description,
         category: formData.category,
@@ -170,20 +170,37 @@ export default function BrokerRequest() {
         ttl: 30 * 60 * 1000 // 30 minutes
       })
 
-      const response = await fetch('/api/mediation-requests', {
+      const response = await fetch('/api/broker-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestData)
       })
       
       if (response.ok) {
-        const created = await response.json()
-        const requestId = created?.id
-        if (!requestId) {
-          throw new Error('لم يتم استرجاع معرف طلب الوساطة')
+        const result = await response.json()
+        const { ticket_number, message, redirect_url } = result
+        if (!ticket_number) {
+          throw new Error('لم يتم استرجاع رقم التذكرة')
         }
-        // الانتقال إلى صفحة الشات باستخدام request (سيختار الدور ويُسجل من هناك)
-        window.location.href = `/chat?request=${requestId}`
+
+        // Show success message with ticket number
+        alert(`${message || 'تم إنشاء طلب الوسيط بنجاح'}\nرقم التذكرة: ${ticket_number}`)
+        
+        // Clear form and close modal
+        setFormData({
+          title: '',
+          description: '',
+          category: '',
+          price: '',
+          location: '',
+          contactInfo: '',
+          requirements: ''
+        })
+        setErrors({})
+        setShowForm(false)
+        
+        // Redirect to ticket page
+        window.location.href = redirect_url || `/ticket?id=${ticket_number}`
       }
       
       setFormData({

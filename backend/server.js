@@ -25,7 +25,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || '84311e590d4692ca767c0db9da51952f';
 
 app.use(helmet({
@@ -157,6 +157,67 @@ const validateAndSanitizeInput = (req, res, next) => {
 };
 
 app.use(validateAndSanitizeInput);
+
+// نظام التحقق من صحة طلبات الوسيط
+const validateBrokerRequest = (req, res, next) => {
+  if (req.method !== 'POST') return next();
+  
+  const b = req.body || {};
+  const errors = [];
+  
+  // التحقق من الحقول المطلوبة
+  if (!b.user_id) errors.push('معرف المستخدم مطلوب');
+  if (!b.title) errors.push('العنوان مطلوب');
+  if (!b.description) errors.push('الوصف مطلوب');
+  if (!b.category) errors.push('التصنيف مطلوب');
+  if (!b.contact_info) errors.push('معلومات الاتصال مطلوبة');
+  
+  // التحقق من أطوال النصوص
+  if (b.title && (b.title.trim().length < 3 || b.title.length > 200)) {
+    errors.push('العنوان يجب أن يكون بين 3-200 حرف');
+  }
+  
+  if (b.description && (b.description.trim().length < 10 || b.description.length > 2000)) {
+    errors.push('الوصف يجب أن يكون بين 10-2000 حرف');
+  }
+  
+  if (b.location && b.location.length > 200) {
+    errors.push('الموقع بحد أقصى 200 حرف');
+  }
+  
+  if (b.requirements && b.requirements.length > 1000) {
+    errors.push('المتطلبات بحد أقصى 1000 حرف');
+  }
+  
+  // التحقق من السعر
+  if (b.price !== undefined && b.price !== null) {
+    const priceNum = Number(b.price);
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      errors.push('السعر يجب أن يكون رقم صحيح أكبر من صفر');
+    }
+  }
+  
+  // التحقق من رقم الهاتف
+  if (b.contact_info) {
+    const rawPhone = validator.unescape(b.contact_info.toString());
+    const phoneRegex = /^(\+966|0)?[5-9][0-9]{8}$/;
+    if (!phoneRegex.test(rawPhone.replace(/\s/g, ''))) {
+      errors.push('يرجى إدخال رقم هاتف سعودي صحيح');
+    }
+  }
+  
+  if (errors.length > 0) {
+    return res.status(400).json({ 
+      error: 'بيانات غير صالحة', 
+      details: errors 
+    });
+  }
+  
+  next();
+};
+
+// تطبيق التحقق على طلبات الوسيط
+app.use('/api/broker-requests', validateBrokerRequest);
 
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {
@@ -590,7 +651,15 @@ app.post('/api/broker-requests', (req, res) => {
       contact_info, requirements, user_role || 'buyer', deadline
     );
 
-    res.json({ id: result.lastInsertRowid, message: 'تم إنشاء الطلب بنجاح' });
+    // إنشاء رقم تذكرة فريد
+    const ticketNumber = `BR${String(result.lastInsertRowid).padStart(6, '0')}`;
+    
+    res.json({ 
+      id: result.lastInsertRowid,
+      ticket_number: ticketNumber,
+      message: 'تم إنشاء طلب الوسيط بنجاح',
+      redirect_url: `/ticket?id=${ticketNumber}`
+    });
   } catch (error) {
     res.status(500).json({ error: 'خطأ في إنشاء طلب الوسيط' });
   }
@@ -630,6 +699,112 @@ app.delete('/api/broker-requests/:id', (req, res) => {
     res.json({ message: 'تم حذف الطلب بنجاح' });
   } catch (error) {
     res.status(500).json({ error: 'خطأ في حذف طلب الوسيط' });
+  }
+});
+
+// API endpoint لجلب تفاصيل التذكرة باستخدام رقم التذكرة
+app.get('/api/broker-requests/ticket/:ticketNumber', (req, res) => {
+  try {
+    const { ticketNumber } = req.params;
+    
+    // التحقق من صيغة رقم التذكرة
+    if (!ticketNumber.startsWith('BR') || ticketNumber.length !== 8) {
+      return res.status(400).json({ 
+        error: 'رقم التذكرة غير صحيح',
+        code: 'INVALID_TICKET_FORMAT'
+      });
+    }
+    
+    // استخراج الرقم من BR000001
+    const ticketId = parseInt(ticketNumber.substring(2));
+    
+    if (isNaN(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ 
+        error: 'رقم التذكرة غير صحيح',
+        code: 'INVALID_TICKET_ID'
+      });
+    }
+
+    // جلب تفاصيل الطلب مع معلومات الوسيط إذا كان مُعين
+    const query = `
+      SELECT 
+        br.*,
+        b.name as broker_name,
+        b.title as broker_title,
+        b.phone as broker_phone,
+        b.email as broker_email,
+        b.rating as broker_rating,
+        b.reviews_count as broker_reviews_count,
+        b.response_time as broker_response_time,
+        b.avatar_url as broker_avatar_url
+      FROM broker_requests br
+      LEFT JOIN brokers b ON br.broker_id = b.id
+      WHERE br.id = ?
+    `;
+    
+    const ticket = db.prepare(query).get(ticketId);
+    
+    if (!ticket) {
+      return res.status(404).json({ 
+        error: 'التذكرة غير موجودة',
+        code: 'TICKET_NOT_FOUND'
+      });
+    }
+
+    // ترجمة حالة الطلب إلى العربية
+    const statusMap = {
+      'pending': 'في الانتظار',
+      'assigned': 'تم التعيين',
+      'in_progress': 'قيد التنفيذ',
+      'completed': 'مكتمل',
+      'cancelled': 'ملغى'
+    };
+
+    // ترجمة التصنيف إلى العربية
+    const categoryMap = {
+      'real-estate': 'عقارات',
+      'vehicles': 'مركبات',
+      'electronics': 'إلكترونيات',
+      'furniture': 'أثاث',
+      'services': 'خدمات',
+      'other': 'أخرى'
+    };
+
+    // تنسيق الاستجابة
+    const response = {
+      id: ticket.id,
+      ticketNumber: `BR${String(ticket.id).padStart(6, '0')}`,
+      title: ticket.title,
+      description: ticket.description,
+      category: ticket.category,
+      categoryText: categoryMap[ticket.category] || ticket.category,
+      price: ticket.price,
+      location: ticket.location,
+      contactInfo: ticket.contact_info,
+      requirements: ticket.requirements,
+      userRole: ticket.user_role,
+      deadline: ticket.deadline,
+      status: ticket.status,
+      statusText: statusMap[ticket.status] || ticket.status,
+      createdAt: ticket.created_at,
+      updatedAt: ticket.updated_at,
+      broker: ticket.broker_id ? {
+        id: ticket.broker_id,
+        name: ticket.broker_name,
+        title: ticket.broker_title,
+        phone: ticket.broker_phone,
+        email: ticket.broker_email,
+        rating: ticket.broker_rating,
+        reviewsCount: ticket.broker_reviews_count,
+        responseTime: ticket.broker_response_time,
+        avatarUrl: ticket.broker_avatar_url
+      } : null
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('خطأ في جلب تفاصيل التذكرة:', error);
+    res.status(500).json({ error: 'خطأ في جلب تفاصيل التذكرة' });
   }
 });
 

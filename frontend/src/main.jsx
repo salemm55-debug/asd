@@ -29,6 +29,7 @@ import Compensation from './pages/Compensation.jsx'
 import NotFound from './pages/NotFound.jsx'
 import ChatNotFound from './pages/ChatNotFound.jsx'
 import TicketNotFound from './pages/TicketNotFound.jsx'
+import Ticket from './pages/Ticket.jsx'
 
 const router = createBrowserRouter([
   {
@@ -57,6 +58,7 @@ const router = createBrowserRouter([
       { path: 'owqerioeqwirjoweiorioqwerioqwerijower', element: <Owqerioeqwirjoweiorioqwerioqwerijower /> },
       { path: 'chat', element: <Chat /> },
       { path: 'compensation', element: <Compensation /> },
+      { path: 'ticket', element: <Ticket /> },
       { path: 'chat-not-found', element: <ChatNotFound /> },
       { path: 'ticket-not-found', element: <TicketNotFound /> },
       { path: '*', element: <NotFound /> }

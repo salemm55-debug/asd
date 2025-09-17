@@ -1,0 +1,79 @@
+{
+  "name": "وسيطك - منصة الوساطة الذكية",
+  "short_name": "وسيطك",
+  "description": "منصة وساطة ذكية وآمنة لجميع أنواع الصفقات",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#128c7e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"],
+  "lang": "ar",
+  "dir": "rtl",
+  "scope": "/",
+  "screenshots": [
+    {
+      "src": "/screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshot2.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "features": [
+    "وساطة آمنة",
+    "شات مباشر",
+    "حماية كاملة",
+    "وسطاء معتمدون"
+  ],
+  "shortcuts": [
+    {
+      "name": "طلب وسيط",
+      "short_name": "طلب وسيط",
+      "description": "اطلب وسيطاً جديداً",
+      "url": "/broker-request",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "الشات",
+      "short_name": "الشات",
+      "description": "انتقل للشات",
+      "url": "/chat",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
